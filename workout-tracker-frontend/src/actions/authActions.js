@@ -1,4 +1,4 @@
-import { loginStart, loginSuccess, getUserSuccess, authError, logout } from '../store/authSlice';
+import { loginStart, loginSuccess, getUserSuccess, authError, logout, resetAuthState, clearError } from '../store/authSlice';
 import * as authService from '../services/authServices';
 
 export const loginUser = (username, password) => async (dispatch) => {
@@ -14,10 +14,25 @@ export const loginUser = (username, password) => async (dispatch) => {
     localStorage.setItem('token', data.access);
     dispatch(loginSuccess({ token: data.access }));
     dispatch(fetchCurrentUser(data.access));
-
   } catch (error) {
+    // Log full technical error to console for developers
     console.error('Login error:', error);
-    dispatch(authError(error.response?.data || 'Login failed'));
+    
+    // Send a user-friendly error to the UI
+    let userError;
+    if (error.response?.data) {
+      if (error.response.data.detail && 
+         (error.response.data.detail.includes('No active account') || 
+          error.response.data.detail.includes('credentials'))) {
+        userError = { message: 'Invalid username or password. Please try again.' };
+      } else {
+        userError = error.response.data;
+      }
+    } else {
+      userError = { message: 'Unable to connect. Please try again later.' };
+    }
+    
+    dispatch(authError(userError));
   }
 };
 
@@ -29,33 +44,120 @@ export const registerUser = (userData) => async (dispatch) => {
     dispatch(loginSuccess({ token: loginData.access }));
     dispatch(fetchCurrentUser(loginData.access));
   } catch (error) {
-    // Format error response safely
-    let errorMessage;
-    if (error.response && error.response.data) {
-      errorMessage = error.response.data;
+    // Log full technical error to console for developers
+    console.error('Registration error details:', error);
+    
+    // Format error for users
+    let userError;
+    if (error.response?.data) {
+      // Handle common registration errors
+      if (error.response.data.username) {
+        userError = { username: 'This username is already taken. Please use a different username or log in.' };
+      } else if (error.response.data.email) {
+        userError = { email: 'This email is already registered. Please use a different email or log in.' };
+      } else if (error.response.data.password) {
+        userError = { password: error.response.data.password };
+      } else {
+        userError = error.response.data;
+      }
     } else if (error.message) {
-      errorMessage = error.message;
+      userError = { message: 'Registration failed. Please try again.' };
     } else {
-      errorMessage = 'Registration failed';
+      userError = { message: 'Registration failed. Please try again.' };
     }
-    dispatch(authError(errorMessage));
+    
+    dispatch(authError(userError));
   }
 };
 
 export const fetchCurrentUser = (token) => async (dispatch) => {
   try {
-    console.log('Fetching user with token:', token);
     const userData = await authService.getCurrentUser(token);
-    console.log('User data received:', userData);
     dispatch(getUserSuccess(userData));
   } catch (error) {
-    console.error('Full error:', error);
+    // Log detailed error to console
+    console.error('User fetch error:', error);
     console.error('Response data:', error.response?.data);
-    dispatch(authError(error.response?.data || 'Failed to fetch user'));
+    
+    // For user data fetch failures, we can just log out without showing errors
+    // since users don't need to see these technical issues
     dispatch(logout());
   }
 };
 
+export const loginWithGoogle = (credential) => async (dispatch) => {
+  try {
+    dispatch(loginStart());
+    
+    const response = await authService.googleLogin(credential);
+    
+    // Store token in localStorage
+    localStorage.setItem('token', response.access);
+    localStorage.setItem('refreshToken', response.refresh);
+    
+    // Update Redux state
+    dispatch(loginSuccess({ token: response.access }));
+    
+    // Set user data directly if available, or fetch it
+    if (response.user) {
+      dispatch(getUserSuccess(response.user));
+    } else {
+      dispatch(fetchCurrentUser(response.access));
+    }
+  } catch (error) {
+    // Log detailed error to console
+    console.error('Google login error:', error);
+    
+    // Show simplified message to user
+    const userError = { message: 'Google login failed. Please try again or use email registration.' };
+    dispatch(authError(userError));
+  }
+};
+
+export const validateCredentials = (credentials) => async (dispatch) => {
+  try {
+    dispatch(loginStart());
+    
+    // Call the validation endpoint
+    await authService.validateCredentials(credentials);
+    
+    // If successful, clear any previous errors
+    dispatch({ type: 'VALIDATE_CREDENTIALS_SUCCESS' });
+    
+    return true;
+  } catch (error) {
+    // Log detailed error to console
+    console.error('Credential validation error:', error);
+    
+    // Format user-friendly error message
+    let userError;
+    if (error.response?.data) {
+      if (error.response.data.username) {
+        userError = { username: 'This username is already taken. Please use a different username or log in.' };
+      } else if (error.response.data.email) {
+        userError = { email: 'This email is already registered. Please use a different email or log in.' };
+      } else {
+        userError = error.response.data;
+      }
+    } else {
+      userError = { message: 'Validation failed. Please check your information.' };
+    }
+    
+    dispatch(authError(userError));
+    return false;
+  }
+};
+
+export const resetAuth = () => (dispatch) => {
+  dispatch(resetAuthState());
+};
+
+export const clearAuthError = () => (dispatch) => {
+  dispatch(clearError());
+};
+
 export const logoutUser = () => (dispatch) => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
   dispatch(logout());
 };

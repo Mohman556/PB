@@ -21,7 +21,7 @@ function Header() {
     <header className="header">
       <div className="header-container">
           <div className="logo">
-              <Link to="/">Personal Best</Link>
+              <Link to="/">MacroLanks</Link>
           </div>
           <nav className="nav-menu">
               <Link to="/" className="nav-link">Home</Link>

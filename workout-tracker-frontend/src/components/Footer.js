@@ -8,13 +8,13 @@ function Footer() {
     <footer className="footer">
       <div className="footer-container">
         <div className="footer-section">
-          <h3>Personal Best</h3>
+          <h3>MacroLanks</h3>
           <p>Track your fitness journey and achieve your goals.</p>
         </div>
       </div>
       
       <div className="footer-bottom">
-        <p>&copy; {2025} Personal Best. All rights reserved.</p>
+        <p>&copy; {2025} MacroLanks. All rights reserved.</p>
       </div>
     </footer>
   );
