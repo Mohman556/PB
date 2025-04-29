@@ -6,6 +6,9 @@ import GoogleLoginButton from './GoogleLoginButton';
 import './assets/css/Log-Reg.css'
 
 const Login = () => {
+
+  const [formErrors, setFormErrors] = useState({});
+
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -34,46 +37,37 @@ const Login = () => {
   };
 
   // Helper function to render error messages properly
-  const renderUserFriendlyError = (error) => {
+  const handleErrorDisplay = (error, fieldName) => {
+    // If error is null or undefined
     if (!error) return null;
     
-    // Log full error to console for developers
-    console.error('Login error:', error);
-    
-    // Handle common user-facing errors
+    // If error is an object
     if (typeof error === 'object') {
-      // Incorrect credentials
-      if (error.detail && (
-        error.detail.includes('No active account') || 
-        error.detail.includes('credentials') ||
-        error.detail.includes('authentication')
-      )) {
-        return <div className="error-message">Invalid username or password. Please try again.</div>;
+      if (error[fieldName]) {
+        return <div className="field-error">
+          {typeof error[fieldName] === 'string' ? error[fieldName] : JSON.stringify(error[fieldName])}
+        </div>;
       }
-      
-      // Detail message (common in Django REST)
-      if (error.detail) {
-        return <div className="error-message">{error.detail}</div>;
-      }
-      
-      // Non-field errors
-      if (error.non_field_errors) {
-        return <div className="error-message">{Array.isArray(error.non_field_errors) ? error.non_field_errors[0] : error.non_field_errors}</div>;
+      return null;
+    }
+    
+    // If error is a string that might be JSON
+    if (typeof error === 'string') {
+      try {
+        // Try to parse it as JSON
+        const errorObj = JSON.parse(error);
+        if (errorObj && errorObj[fieldName]) {
+          return <div className="field-error">{errorObj[fieldName]}</div>;
+        }
+      } catch (e) {
+        // Not a JSON string, try to match the field name in the error string
+        if (error.toLowerCase().includes(fieldName.toLowerCase())) {
+          return <div className="field-error">{error}</div>;
+        }
       }
     }
     
-    // For string errors that match common authentication issues
-    if (typeof error === 'string' && (
-      error.includes('credentials') || 
-      error.includes('login') || 
-      error.includes('username') ||
-      error.includes('password')
-    )) {
-      return <div className="error-message">{error}</div>;
-    }
-    
-    // Generic user-friendly message for all other errors
-    return <div className="error-message">Login failed. Please try again.</div>;
+    return null;
   };
 
   if (isAuthenticated) {
@@ -81,31 +75,21 @@ const Login = () => {
   }
 
   return (
-    <div className="login-container">
-      {/* <h2>Login</h2> */}
-      {error && <div className="error-message">{renderUserFriendlyError(error)}</div>}
-      
+    <div className="login-container"> 
+
       <div className='form-container'>
         <form className='forms' onSubmit={onSubmit}>
           <div className="form-group">
             <label>Username</label>
-            <input
-              type="text"
-              name="username"
-              value={username}
-              onChange={onChange}
-              required
-            />
+            <input type="text" name="username" value={username} onChange={onChange} required/>
+            {handleErrorDisplay(error, 'username')}
+            {formErrors.username && <div className="field-error">{formErrors.username}</div>}
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input
-              type="password"
-              name="password"
-              value={password}
-              onChange={onChange}
-              required
-            />
+            <input type="password" name="password" value={password} onChange={onChange} required/>
+            {handleErrorDisplay(error, 'password')}
+            {formErrors.password && <div className="field-error">{formErrors.password}</div>}
           </div>
           <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? 'Logging in...' : 'Login'}
@@ -126,7 +110,29 @@ const Login = () => {
       <div className="google-login-container">
         <GoogleLoginButton />
       </div>
-      
+      {error && !handleErrorDisplay(error, 'username') && 
+        !handleErrorDisplay(error, 'password') && (
+          <div className='error-container'>
+            <div className="error-message">
+              {typeof error === 'string' ? (
+                (() => {
+                  try {
+                    const errorObj = JSON.parse(error);
+                    return errorObj.message || errorObj.detail || error;
+                  } catch (e) {
+                    return error;
+                  }
+                })()
+              ) : (
+                error.message || error.detail || JSON.stringify(error)
+              )}
+            </div>
+
+          </div>
+            
+
+        )
+      } 
     </div>
   );
 };

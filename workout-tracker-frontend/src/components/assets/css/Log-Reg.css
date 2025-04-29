@@ -26,6 +26,7 @@ Format
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  margin-bottom: 15px;
 }
 
 .form-side {
@@ -152,6 +153,21 @@ Forms
   z-index: 1;
 }
 
+.error-container{
+  margin-top: 50px;
+  margin: auto;
+  background-color: #f44336;
+  width: max-content;
+  padding: 1em;
+  border-radius: 10px;
+  border: 2px solid black;
+  font-weight: bold;
+  color: white;
+}
+.error-message{  
+  text-align: center;
+}
+
 /*
 Password Error
 ==================
@@ -212,6 +228,12 @@ Password Error
   color: #666;
 }
 
+.password-error-list {
+  margin-top: 5px;
+  padding-left: 20px;
+  font-size: 0.8rem;
+  color: #dc3545;
+}
 /*
 Google Button
 ==================

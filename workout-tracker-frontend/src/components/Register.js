@@ -36,15 +36,20 @@ const calculatePasswordStrength = (password) => {
   return { score, feedback };
 };
 
-const getPasswordRequirements = (password) => {
-  const requirements = [
-    { met: password.length >= 8, text: 'At least 8 characters' },
-    { met: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Mix of uppercase and lowercase letters' },
-    { met: /\d/.test(password), text: 'At least one number' },
-    { met: /[^A-Za-z0-9]/.test(password), text: 'At least one special character' }
-  ];
-  
-  return requirements;
+const pass_requirements = [
+  { test: (password) => password.length >= 8, message: 'At least 8 characters' },
+  { test: (password) => /[a-z]/.test(password), message: 'At least one lowercase letter' },
+  { test: (password) => /[A-Z]/.test(password), message: 'At least one uppercase letter' },
+  { test: (password) => /\d/.test(password), message: 'At least one number' },
+  { test: (password) => /[^A-Za-z0-9]/.test(password), message: 'At least one special character' }
+];
+
+const validatePassword = (password) => {
+  const failedRequirements = pass_requirements.filter(req => !req.test(password));
+  return {
+    isValid: failedRequirements.length <= 1, 
+    failedRequirements
+  };
 };
 
 const Register = () => {
@@ -80,7 +85,7 @@ const Register = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  //Error Logging and parsing
+  //Error Logging
   useEffect(() => {
     if (error) {
       console.log("Error state:", error);
@@ -90,21 +95,6 @@ const Register = () => {
       }
     }
   }, [error]);
-
-  const parseErrorString = (errorString, fieldName) => {
-    if (!errorString) return null;
-    
-    // Convert to lowercase for case-insensitive matching
-    const lowerErrorString = errorString.toLowerCase();
-    const lowerFieldName = fieldName.toLowerCase();
-    
-    // Check if the error string mentions this field
-    if (lowerErrorString.includes(lowerFieldName)) {
-      return errorString;
-    }
-    
-    return null;
-  };
 
   const onChange = e => {
     // Clear any errors when user starts typing
@@ -166,20 +156,21 @@ const Register = () => {
     // Check password match
     if (password !== re_password) {
       newErrors.passwordMatch = "Passwords do not match";
-
+    }
     // Check password strength
-    if (passwordStrength.score < 3) {
-      newErrors.password = "Please create a stronger password";
+    if (password) {
+      const { isValid, failedRequirements } = validatePassword(password);
+      if (!isValid) {
+        newErrors.password = "Password doesn't meet requirements";
+        newErrors.passwordRequirements = failedRequirements.map(req => req.message);
+      }
     }
     
     // Set the errors and return whether form is valid
     setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-    }
     
-    // Set the errors and return whether form is valid
-    setFormErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
   };
 
   // Handle first step submission with validation
@@ -199,6 +190,7 @@ const Register = () => {
     // Only proceed to next step if validation passed
     if (credentialsValid) {
       setStep('profile');
+      dispatch(resetAuth());
     }
     // If validation failed, the error will be displayed via the error state
   };
@@ -231,7 +223,6 @@ const Register = () => {
 
   // Password state
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: '' });
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   
   // Update password strength when password changes
   useEffect(() => {
@@ -248,25 +239,6 @@ const Register = () => {
 
   return (
     <div className="register-container">
-      {error && !handleErrorDisplay(error, 'username') && 
-        !handleErrorDisplay(error, 'email') && 
-        !handleErrorDisplay(error, 'password') && (
-          <div className="error-message">
-            {typeof error === 'string' ? (
-              (() => {
-                try {
-                  const errorObj = JSON.parse(error);
-                  return errorObj.message || errorObj.detail || error;
-                } catch (e) {
-                  return error;
-                }
-              })()
-            ) : (
-              error.message || error.detail || JSON.stringify(error)
-            )}
-          </div>
-        )
-      }
       <h2>Register your account</h2>
       <div className='split-layout'>
         
@@ -305,19 +277,32 @@ const Register = () => {
                   </div>
                 )}
                 {/* Password requirements */}
-                <div className="password-requirements">
-                  <p style={{color:'black'}}>Password must have:</p>
-                  <ul>
-                    {getPasswordRequirements(password).map((req, index) => (
-                      <li key={index} className={req.met ? 'requirement-met' : 'requirement-missing'}>
-                        {req.met ? '✓' : '○'} {req.text}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {password && (
+                  <div className="password-requirements">
+                    <p style={{color: 'black'}}>Password requirements:</p>
+                    <ul>
+                      {pass_requirements.map((req, index) => (
+                        <li key={index} className={req.test(password) ? 'requirement-met' : 'requirement-missing'}>
+                          {req.test(password) ? '✓' : '○'} {req.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {/* Error messages */}
+                {formErrors.password && (
+                  <div className="field-error">
+                    {formErrors.password}
+                    {formErrors.passwordRequirements && (
+                      <ul className="password-error-list">
+                        {formErrors.passwordRequirements.map((msg, i) => (
+                          <li key={i}>{msg}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 {handleErrorDisplay(error, 'password')}
-                {formErrors.password && <div className="field-error">{formErrors.password}</div>}
               </div>
               
               <div className="form-group">
@@ -337,6 +322,26 @@ const Register = () => {
           ) : (
             /* Step 2: Profile Form */
             <form onSubmit={onProfileSubmit}>
+              {error && !handleErrorDisplay(error, 'height') && 
+                !handleErrorDisplay(error, 'weight') && 
+                !handleErrorDisplay(error, 'goal') && 
+                !handleErrorDisplay(error, 'DOB') && (
+                  <div className="error-message">
+                    {typeof error === 'string' ? (
+                      (() => {
+                        try {
+                          const errorObj = JSON.parse(error);
+                          return errorObj.message || errorObj.detail || error;
+                        } catch (e) {
+                          return error;
+                        }
+                      })()
+                    ) : (
+                      error.message || error.detail || JSON.stringify(error)
+                    )}
+                  </div>
+                )
+              }
               <div className="form-header">
                 <h2>Complete Your Profile</h2>
               </div>
@@ -344,52 +349,37 @@ const Register = () => {
                 <label>Height</label>
                 <div className="height-fields">
                   <div className="feet-field">
-                    <input 
-                      type="number" 
-                      name="feet" 
-                      value={feet} 
-                      onChange={onChange} 
-                      min="0" 
-                      max="8" 
-                      placeholder="ft"
-                    />
+                    <input type="number" name="feet" value={feet} onChange={onChange} required min="0" max="10" placeholder="ft"/>
                     <span>ft</span>
                   </div>
                   <div className="inches-field">
-                    <input 
-                      type="number" 
-                      name="inches" 
-                      value={inches} 
-                      onChange={onChange} 
-                      min="0" 
-                      max="11" 
-                      placeholder="in"
-                    />
+                    <input type="number" name="inches" value={inches} onChange={onChange} required min="0" max="11" placeholder="in"/>
                     <span>in</span>
                   </div>
                 </div>
+                {handleErrorDisplay(error, 'height')}
+                {formErrors.height && <div className="field-error">{formErrors.height}</div>}
               </div>
               
               <div className="form-group">
                 <label>Weight (lbs)</label>
-                <input 
-                  type="number" 
-                  name="weight" 
-                  value={weight} 
-                  onChange={onChange} 
-                  min="0" 
-                  placeholder="lbs"
-                />
+                <input type="number" name="weight" value={weight} onChange={onChange} required min="0" placeholder="lbs"/>
+                {handleErrorDisplay(error, 'weight')}
+                {formErrors.weight && <div className="field-error">{formErrors.weight}</div>}
               </div>
               
               <div className="form-group">
                 <label>Fitness Goal</label>
-                <input type="text" name="fitness_goal" value={fitness_goal} onChange={onChange} />
+                <input type="text" name="fitness_goal" value={fitness_goal} onChange={onChange} required/>
+                {handleErrorDisplay(error, 'goal')}
+                {formErrors.goal && <div className="field-error">{formErrors.goal}</div>}
               </div>
               
               <div className="form-group">
                 <label>Date of Birth</label>
-                <input type="date" name="date_of_birth" value={date_of_birth} onChange={onChange} />
+                <input type="date" name="date_of_birth" value={date_of_birth} onChange={onChange} required/>
+                {handleErrorDisplay(error, 'DOB')}
+                {formErrors.DOB && <div className="field-error">{formErrors.DOB}</div>}
               </div>
               
               <div className="form-actions">
@@ -415,8 +405,30 @@ const Register = () => {
           </div>
         </div>
       )}
+      
       </div>
+      {error && !handleErrorDisplay(error, 'username') && 
+        !handleErrorDisplay(error, 'email') && 
+        !handleErrorDisplay(error, 'password') && (
+          <div className='error-container'>
+            <div className="error-message">
+              {typeof error === 'string' ? (
+                (() => {
+                  try {
+                    const errorObj = JSON.parse(error);
+                    return errorObj.message || errorObj.detail || error;
+                  } catch (e) {
+                    return error;
+                  }
+                })()
+              ) : (
+                error.message || error.detail || JSON.stringify(error)
+              )}
+            </div>
 
+          </div>
+        )
+      }
     </div>
   );
 };
