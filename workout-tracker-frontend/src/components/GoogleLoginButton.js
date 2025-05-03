@@ -27,17 +27,19 @@ const GoogleLoginButton = () => {
     script.async = true;
     document.body.appendChild(script);
 
+    const handleCredentialResponse = (response) => {
+      if (response.credential) {
+        dispatch(loginWithGoogle(response.credential));
+      }
+    };
+
     return () => {
       // Cleanup
       document.body.removeChild(script);
     };
   }, [dispatch]);
 
-  const handleCredentialResponse = (response) => {
-    if (response.credential) {
-      dispatch(loginWithGoogle(response.credential));
-    }
-  };
+
 
   return <div id="google-login-button" className="google-login-button"></div>;
 };

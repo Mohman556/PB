@@ -14,7 +14,7 @@ function Footer() {
       </div>
       
       <div className="footer-bottom">
-        <p>&copy; {2025} MacroLanks. All rights reserved.</p>
+        <p>&copy; {currentYear} MacroLanks. All rights reserved.</p>
       </div>
     </footer>
   );

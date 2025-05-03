@@ -7,7 +7,7 @@ import './assets/css/Log-Reg.css'
 
 const Login = () => {
 
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors] = useState({});
 
   const [formData, setFormData] = useState({
     username: '',
