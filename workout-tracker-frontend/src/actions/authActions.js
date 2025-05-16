@@ -9,20 +9,6 @@ const ensureNumeric = (value) => {
   return isNaN(parsed) ? null : parsed;
 };
 
-// Helper function to safely process user data
-const processUserData = (userData) => {
-  if (!userData) return null;
-  
-  return {
-    ...userData,
-    // Handle numeric fields safely
-    height: ensureNumeric(userData.height),
-    weight: ensureNumeric(userData.weight),
-    fitness_goal: ensureNumeric(userData.fitness_goal),
-    initial_weight: ensureNumeric(userData.initial_weight)
-  };
-};
-
 export const loginUser = (username, password) => async (dispatch) => {
   try {
     dispatch(loginStart());
@@ -118,112 +104,81 @@ export const loginWithGoogle = (credential) => async (dispatch) => {
   try {
     dispatch(loginStart());
     
-    console.log('Attempting Google login with credential');
+    console.log('Processing Google login with credential');
     
-    // Call the API
-    const response = await authService.googleLogin(credential);
-    console.log('Google login API response received:', response);
-    
-    // Check for the access token
-    if (!response.access) {
-      console.error('No access token in response:', response);
-      dispatch(authError({ message: 'Login failed: No access token received' }));
-      return;
-    }
-    
-    // Store token in localStorage
-    localStorage.setItem('token', response.access);
-    if (response.refresh) {
-      localStorage.setItem('refreshToken', response.refresh);
-    }
-    
-    // Update Redux with token
-    dispatch(loginSuccess({ token: response.access }));
-    
-    // Handle user data
-    if (response.user) {
-      console.log('User data received in Google login response');
+    // Call the API with improved error handling
+    try {
+      const response = await authService.googleLogin(credential);
+      console.log('Google login API response received');
       
-      // Try-catch to ensure graceful handling if user data parsing fails
-      try {
-        // Ensure numeric values for user data
+      // Check for the access token
+      if (!response || !response.access) {
+        console.error('Invalid response structure:', response);
+        dispatch(authError({ message: 'Login failed: Invalid server response' }));
+        return;
+      }
+      
+      // Store token in localStorage
+      localStorage.setItem('token', response.access);
+      if (response.refresh) {
+        localStorage.setItem('refreshToken', response.refresh);
+      }
+      
+      // Update Redux with token
+      dispatch(loginSuccess({ token: response.access }));
+      
+      // Process user data safely
+      if (response.user) {
+        console.log('User data received with Google login');
+        
+        // Ensure numeric values
         const processedUser = {
           ...response.user,
           height: ensureNumeric(response.user.height),
           weight: ensureNumeric(response.user.weight),
           fitness_goal: ensureNumeric(response.user.fitness_goal),
-          initial_weight: ensureNumeric(response.user.initial_weight)
+          initial_weight: ensureNumeric(response.user.initial_weight || response.user.weight)
         };
         
-        console.log('Processed user data:', processedUser);
         dispatch(getUserSuccess(processedUser));
-      } catch (dataError) {
-        console.error('Error processing user data:', dataError);
         
-        // Create clean user object with nulls for profile metrics
-        const defaultUser = {
-          username: response.user.username || '',
-          email: response.user.email || '',
-          height: null,
-          weight: null, 
-          fitness_goal: null,
-          initial_weight: null
-        };
-        
-        console.log('Using default user data with null metrics:', defaultUser);
-        dispatch(getUserSuccess(defaultUser));
+        // Save backup to localStorage for resilience
+        try {
+          localStorage.setItem('workout_tracker_profile', JSON.stringify({
+            height: processedUser.height,
+            weight: processedUser.weight,
+            fitness_goal: processedUser.fitness_goal,
+            initial_weight: processedUser.initial_weight,
+            savedAt: new Date().toISOString()
+          }));
+        } catch (storageError) {
+          console.warn('Failed to save profile backup:', storageError);
+        }
+      } else {
+        console.log('No user data in response, fetching separately');
+        dispatch(fetchCurrentUser());
       }
-    } else {
-      console.log('No user data in response, fetching separately');
+    } catch (apiError) {
+      // Handle API-specific errors
+      console.error('Google login API error:', apiError);
       
-      // Fetch user data separately
-      try {
-        const userData = await authService.getCurrentUser();
-        console.log('User data fetched after Google login:', userData);
-        
-        // Process to ensure numeric types
-        const processedUser = {
-          ...userData,
-          height: ensureNumeric(userData.height),
-          weight: ensureNumeric(userData.weight),
-          fitness_goal: ensureNumeric(userData.fitness_goal),
-          initial_weight: ensureNumeric(userData.initial_weight) 
-        };
-        
-        dispatch(getUserSuccess(processedUser));
-      } catch (fetchError) {
-        console.error('Failed to fetch user after Google login:', fetchError);
-        
-        // Default user with email from token if possible
-        const defaultUser = {
-          username: 'User',
-          email: response.email || '',
-          height: null,
-          weight: null,
-          fitness_goal: null,
-          initial_weight: null
-        };
-        
-        console.log('Using minimal default user data:', defaultUser);
-        dispatch(getUserSuccess(defaultUser));
+      let errorMessage = 'Google login failed. Please try again.';
+      
+      // Extract more specific error message if available
+      if (apiError.response?.data?.error) {
+        errorMessage = apiError.response.data.error;
+      } else if (apiError.response?.data?.detail) {
+        errorMessage = apiError.response.data.detail;
       }
+      
+      dispatch(authError({ message: errorMessage }));
+      return;
     }
   } catch (error) {
-    console.error('Google login error:', error);
-    
-    // Log detailed error info for debugging
-    if (error.response) {
-      console.error('Error response status:', error.response.status);
-      console.error('Error response data:', error.response.data);
-    }
-    
-    // Show simplified message to user
-    const userError = { 
-      message: 'Google login failed. Please try again or use email registration.',
-      details: error.message
-    };
-    
-    dispatch(authError(userError));
+    console.error('Unhandled error in Google login action:', error);
+    dispatch(authError({ 
+      message: 'Login failed due to an unexpected error. Please try again.' 
+    }));
   }
 };
 

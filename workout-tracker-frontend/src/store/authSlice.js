@@ -1,17 +1,29 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// Helper function to ensure numeric values
 const ensureNumeric = (value) => {
   if (value === null || value === undefined) return null;
   const parsed = parseFloat(value);
   return isNaN(parsed) ? null : parsed;
 };
 
+// Process user data to ensure consistent numeric types
+const processUserData = (userData) => {
+  if (!userData) return null;
+  
+  return {
+    ...userData,
+    height: ensureNumeric(userData.height),
+    weight: ensureNumeric(userData.weight),
+    fitness_goal: ensureNumeric(userData.fitness_goal),
+    initial_weight: ensureNumeric(userData.initial_weight || userData.weight)
+  };
+};
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     token: localStorage.getItem('token'),
-    isAuthenticated: false,
+    isAuthenticated: localStorage.getItem('token') ? true : false,
     user: null,
     loading: false,
     error: null
@@ -22,21 +34,14 @@ const authSlice = createSlice({
       state.error = null;
     },
     loginSuccess: (state, action) => {
-      state.loading = false;
-      state.isAuthenticated = true;
       state.token = action.payload.token;
+      state.isAuthenticated = true;
+      state.loading = false;
       state.error = null;
+      localStorage.setItem('token', action.payload.token);
     },
     getUserSuccess: (state, action) => {
-      const userData = action.payload;
-      state.user = {
-        ...userData,
-        height: ensureNumeric(userData.height),
-        weight: ensureNumeric(userData.weight),
-        fitness_goal: ensureNumeric(userData.fitness_goal),
-        initial_weight: ensureNumeric(userData.initial_weight)
-      };
-
+      state.user = processUserData(action.payload);
       state.loading = false;
       state.isAuthenticated = true;
     },
@@ -53,6 +58,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.user = null;
       state.error = null;
+      localStorage.removeItem('token');
     },
     resetAuthState: (state) => {
       state.loading = false;
@@ -64,5 +70,14 @@ const authSlice = createSlice({
   }
 });
 
-export const { loginStart, loginSuccess, getUserSuccess, authError, logout, resetAuthState, clearError } = authSlice.actions;
+export const { 
+  loginStart, 
+  loginSuccess, 
+  getUserSuccess, 
+  authError, 
+  logout, 
+  resetAuthState, 
+  clearError 
+} = authSlice.actions;
+
 export default authSlice.reducer;

@@ -1,13 +1,18 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.http import HttpResponse
+from django.conf import settings
+from django.views.decorators.csrf import csrf_protect
+# from django_ratelimit.decorators import ratelimit
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from django.conf import settings
 from .serializers import UserSerializer
 import logging
 import time
@@ -49,121 +54,121 @@ def server_time(request):
         'human_readable': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
     })
 
+# @ratelimit(key='ip', rate='25/h', method='POST', block=True)
+@csrf_protect
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def google_login(request):
     """
-    Google login API endpoint with clock skew handling
+    Google login API endpoint
     """
+    client_ip = request.META.get('REMOTE_ADDR', 'unknown')
+    logger.info(f"Google login attempt from IP: {client_ip}")
+
+
     credential = request.data.get('credential')
     
     if not credential:
-        logger.error("No credential provided in request data")
+        logger.warning(f"Missing credential in request from IP: {client_ip}")
         return Response(
             {'error': 'Google credential is required'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
     try:
-        # Log server time for debugging
+        # Record server time for debugging clock skew issues
         server_time = int(time.time())
-        logger.info(f"Server timestamp: {server_time}")
         
-        # Verify the token with Google with clock skew tolerance
-        idinfo = id_token.verify_oauth2_token(
-            credential, 
-            requests.Request(), 
-            settings.GOOGLE_CLIENT_ID,
-            clock_skew_in_seconds=300  # Allow 5 minutes of clock skew
-        )
+        # Verify token with Google with generous clock skew tolerance
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                credential, 
+                requests.Request(), 
+                settings.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=600  # Allow 10 minutes of clock skew
+            )
+            logger.info(f"Google token validated successfully for email: {idinfo.get('email', 'unknown')}")
+        except ValueError as ve:
+            error_msg = str(ve)
+            logger.warning(f"Google token validation failed from IP {client_ip}: {error_msg}")
+            
+            # Special handling for common errors
+            if "Token used too early" in error_msg or "Token used before issued" in error_msg:
+                return Response({
+                    'error': 'Authentication failed due to time synchronization issues.',
+                    'details': error_msg,
+                    'server_time': server_time
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            return Response({
+                'error': 'Google authentication failed',
+                'details': error_msg
+            }, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Get user info from the verified token
-        email = idinfo['email']
+        # Extract user info from verified token
+        email = idinfo.get('email')
+        if not email:
+            logger.warning(f"No email found in token from IP: {client_ip}")
+            return Response({'error': 'Email not provided by Google'}, status=status.HTTP_400_BAD_REQUEST)
+            
         name = idinfo.get('name', '')
         
-        logger.info(f"Google login successful for email: {email}")
-        
-        # Check if user exists
+        # Look up or create user
         try:
             user = User.objects.get(email=email)
-            logger.info(f"Found existing user: {user.username}")
+            logger.info(f"Existing user found: {user.username}")
         except User.DoesNotExist:
             # Create a new user
             username = email.split('@')[0]
-            # Make sure username is unique
-            if User.objects.filter(username=username).exists():
-                username = f"{username}_{User.objects.count()}"
             
-            logger.info(f"Creating new user with username: {username}")
+            # Ensure username is unique
+            base_username = username
+            count = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{count}"
+                count += 1
+            
+            logger.info(f"Creating new user with username: {username} for email: {email}")
             
             user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=None
             )
-            user.set_unusable_password()  # User can't login with password
+            user.set_unusable_password()
             
-            # Add additional info if available
+            # Add name information if available
             if name:
-                user.first_name = name.split(' ')[0] if ' ' in name else name
-                user.last_name = name.split(' ')[1] if ' ' in name else ''
+                parts = name.split(' ', 1)
+                user.first_name = parts[0]
+                user.last_name = parts[1] if len(parts) > 1 else ''
             
             user.save()
         
-        # Generate tokens
+        # Generate JWT tokens for authentication
         refresh = RefreshToken.for_user(user)
         
-        # Include full user data in response
+        # Get serialized user data
         from .serializers import UserSerializer
         serializer = UserSerializer(user)
         
+        # Record successful login
+        logger.info(f"Google login successful for user: {user.username} from IP: {client_ip}")
+        
+        # Return success response with tokens and user data
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
             'user': serializer.data
         })
-        
-    except ValueError as e:
-        # Log detailed error message
-        error_msg = str(e)
-        logger.error(f"Invalid Google token: {error_msg}")
-        
-        # Check for time-related errors and provide better user feedback
-        if "Token used too early" in error_msg or "Token used before" in error_msg:
-            server_time = int(time.time())
-            logger.error(f"Clock synchronization issue. Server time: {server_time}")
             
-            return Response({
-                'error': 'Authentication failed due to time synchronization issues. Please sync your system clock.',
-                'details': error_msg,
-                'server_time': server_time
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        
-        return Response(
-            {'error': f'Invalid token: {error_msg}'}, 
-            status=status.HTTP_401_UNAUTHORIZED
-        )
     except Exception as e:
-        logger.exception(f"Error in Google login: {e}")
+        logger.exception(f"Unexpected error in Google login from IP {client_ip}: {str(e)}")
         return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_400_BAD_REQUEST
+            {'error': 'Login failed due to an internal error. Please try again later.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-class UserProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
-    
-    def patch(self, request):
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response(serializer.data)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -181,3 +186,20 @@ def validate_email(request):
         'email': email,
         'exists': email_exists
     })
+
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+    
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response(serializer.data)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

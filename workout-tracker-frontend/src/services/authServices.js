@@ -1,4 +1,5 @@
 import axiosInstance from '../utils/axiosConfig';
+import axios from 'axios';
 
 
 export const login = async (username, password) => {
@@ -8,46 +9,33 @@ export const login = async (username, password) => {
 
 export const googleLogin = async (credential) => {
   try {
-    console.log('Sending Google credential to backend: length:', credential?.length || 0);
+    console.log('Sending Google credential to backend');
+    
+    // Create request payload
     const payload = { credential };
-    console.log('API request payload:', { credential: credential ? `${credential.substring(0, 15)}...` : null });
-
-    const response = await axiosInstance.post(
-      'users/google-login/', 
+    
+    // Make the API request without Authorization header
+    const response = await axios.post(
+      'http://localhost:8000/api/users/google-login/',  // Make sure URL is correct
       payload,
       {
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        // Do NOT include Authorization header here
       }
     );
-    console.log('Google login API call successful:', response.status);
-    console.log('Response data structure:', Object.keys(response.data));
     
+    console.log('Google login successful');
     return response.data;
   } catch (error) {
-    // Enhanced error logging
-    console.error('Google login service error:', error.message);
+    console.error('Google login failed:', error.message);
     
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-      console.error('Response data:', error.response.data);
-      if (error.response.status === 400){
-        console.error('400 Bad Request - Check if the backend is properly handling the credential format');
-        console.error('Backend validation error details:', error.response.data);
-      }else if (error.response.status === 401){
-        console.error('401 Unauthorized - Google token validation failed on the server');
-      }
-    } else if (error.request) {
-      console.error('No response received. Request details:', {
-        method: error.request.method,
-        url: error.request.url,
-        headers: error.request.headers
-      });
+    // Extract error details
+    if (error.response?.data) {
+      console.error('Server error details:', error.response.data);
     }
     
-    // Rethrow for action handler
     throw error;
   }
 };
