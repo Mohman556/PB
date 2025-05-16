@@ -24,7 +24,41 @@ function AppContent() {
     // Check if user is already logged in
     const token = localStorage.getItem('token');
     if (token) {
-      store.dispatch(fetchCurrentUser(token));
+      console.log('Token found in localStorage, fetching current user data...');
+      
+      const loadUserWithDebugging = async () => {
+        try {
+          console.log('Loading user data on application initialization');
+          
+          await store.dispatch(fetchCurrentUser(token));
+
+          const currentState = store.getState();
+          console.log('User data loaded into Redux:', currentState.auth.user);
+          
+          // Check if numeric fields are properly stored as numbers
+          if (currentState.auth.user) {
+            const { height, weight, fitness_goal } = currentState.auth.user;
+            console.log('Field types check:');
+            console.log('- height:', typeof height, height);
+            console.log('- weight:', typeof weight, weight);
+            console.log('- fitness_goal:', typeof fitness_goal, fitness_goal);
+
+            if (height && typeof height !== 'number') {
+              console.warn('Height is not stored as a number in Redux!');
+            }
+            if (weight && typeof weight !== 'number') {
+              console.warn('Weight is not stored as a number in Redux!');
+            }
+            if (fitness_goal && typeof fitness_goal !== 'number') {
+              console.warn('Fitness goal is not stored as a number in Redux!');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load user data on initialization:', error);
+        }
+      };
+      
+      loadUserWithDebugging();
     }
   }, []);
 

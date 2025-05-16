@@ -202,10 +202,17 @@ const Register = () => {
     const height = feet && inches 
       ? (parseFloat(feet) * 30.48 + parseFloat(inches) * 2.54).toFixed(2) 
       : '';
-    
+
+    let weightKg = weight;
+    let goalKg = fitness_goal;    
+    weightKg = weight ? (parseFloat(weight) / 2.20462).toFixed(2) : '';
+    goalKg = fitness_goal ? (parseFloat(fitness_goal) / 2.20462).toFixed(2) : '';
+      
     const submissionData = {
       ...formData,
       height: height || null,
+      weight: weightKg || null,
+      fitness_goal: goalKg || null,
     };
     
     delete submissionData.feet;
@@ -362,15 +369,15 @@ const Register = () => {
               </div>
               
               <div className="form-group">
-                <label>Weight (lbs)</label>
-                <input type="number" name="weight" value={weight} onChange={onChange} required min="0" placeholder="lbs"/>
+                <label>Weight (kgs)</label>
+                <input type="number" name="weight" value={weight} onChange={onChange} required min="0" placeholder= "kg"/>
                 {handleErrorDisplay(error, 'weight')}
                 {formErrors.weight && <div className="field-error">{formErrors.weight}</div>}
               </div>
               
               <div className="form-group">
-                <label>Fitness Goal</label>
-                <input type="text" name="fitness_goal" value={fitness_goal} onChange={onChange} required/>
+                <label>Fitness Goal (Target Weight)</label>
+                <input type="number" name="fitness_goal" value={fitness_goal} onChange={onChange} min="0" placeholder= "kg" required/>
                 {handleErrorDisplay(error, 'goal')}
                 {formErrors.goal && <div className="field-error">{formErrors.goal}</div>}
               </div>

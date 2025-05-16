@@ -1,5 +1,7 @@
 :root {
   /* Light theme variables */
+
+  /* General */
   --bg-color: #D3D3D3;
   --text-color: #333333;
   --header-bg: #333333;
@@ -9,10 +11,21 @@
   --card-bg: #f8f9fa;
   --hero-gradient-from: #38b6ff;
   --hero-gradient-to: #5271ff;
+
+  /* Profile */
+  --profile-bg: #f8f9fa;
+  --profile-cmp-bg: white;
+  --unit-bg-NaN: #e9ecef;
+  --edit-bd: 1px solid #333333;
+  --progress-text: #495057;
+  --bmi-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
 }
 
 body.dark {
   /* Dark theme variables */
+
+  /* General */
   --bg-color: #121212;
   --text-color: #f0f0f0;
   --header-bg: #1f1f1f;
@@ -22,6 +35,14 @@ body.dark {
   --card-bg: #2d2d2d;
   --hero-gradient-from: #2a3a80;
   --hero-gradient-to: #1f4b8f;
+
+  /* Profile */
+  --profile-bg: #333333;
+  --profile-cmp-bg: #121212;
+  --unit-bg-NaN: #333333;
+  --edit-bd: 1px solid #ced4da;
+  --progress-text: #ffffff;
+  --bmi-bg: linear-gradient(135deg, #764ba2 0%,  #667eea 100%);
 }
 
 body {

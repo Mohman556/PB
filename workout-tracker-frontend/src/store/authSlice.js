@@ -1,10 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// Helper function to ensure numeric values
+const ensureNumeric = (value) => {
+  if (value === null || value === undefined) return null;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? null : parsed;
+};
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     token: localStorage.getItem('token'),
-    isAuthenticated: localStorage.getItem('token') ? true : false,
+    isAuthenticated: false,
     user: null,
     loading: false,
     error: null
@@ -15,13 +22,23 @@ const authSlice = createSlice({
       state.error = null;
     },
     loginSuccess: (state, action) => {
-      state.token = action.payload.token;
-      state.isAuthenticated = true;
       state.loading = false;
-      localStorage.setItem('token', action.payload.token);
+      state.isAuthenticated = true;
+      state.token = action.payload.token;
+      state.error = null;
     },
     getUserSuccess: (state, action) => {
-      state.user = action.payload;
+      const userData = action.payload;
+      state.user = {
+        ...userData,
+        height: ensureNumeric(userData.height),
+        weight: ensureNumeric(userData.weight),
+        fitness_goal: ensureNumeric(userData.fitness_goal),
+        initial_weight: ensureNumeric(userData.initial_weight)
+      };
+
+      state.loading = false;
+      state.isAuthenticated = true;
     },
     authError: (state, action) => {
       const errorMessage = typeof action.payload === 'object' 
@@ -35,7 +52,7 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       state.user = null;
-      localStorage.removeItem('token');
+      state.error = null;
     },
     resetAuthState: (state) => {
       state.loading = false;

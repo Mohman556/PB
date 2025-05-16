@@ -1,6 +1,28 @@
 import { loginStart, loginSuccess, getUserSuccess, authError, logout, resetAuthState, clearError } from '../store/authSlice';
 import * as authService from '../services/authServices';
 
+
+// Helper function for ensuring numeric values
+const ensureNumeric = (value) => {
+  if (value === null || value === undefined) return null;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? null : parsed;
+};
+
+// Helper function to safely process user data
+const processUserData = (userData) => {
+  if (!userData) return null;
+  
+  return {
+    ...userData,
+    // Handle numeric fields safely
+    height: ensureNumeric(userData.height),
+    weight: ensureNumeric(userData.weight),
+    fitness_goal: ensureNumeric(userData.fitness_goal),
+    initial_weight: ensureNumeric(userData.initial_weight)
+  };
+};
+
 export const loginUser = (username, password) => async (dispatch) => {
   try {
     dispatch(loginStart());
@@ -13,6 +35,8 @@ export const loginUser = (username, password) => async (dispatch) => {
     }
     localStorage.setItem('token', data.access);
     dispatch(loginSuccess({ token: data.access }));
+
+
     dispatch(fetchCurrentUser(data.access));
   } catch (error) {
     // Log full technical error to console for developers
@@ -73,14 +97,19 @@ export const registerUser = (userData) => async (dispatch) => {
 export const fetchCurrentUser = (token) => async (dispatch) => {
   try {
     const userData = await authService.getCurrentUser(token);
-    dispatch(getUserSuccess(userData));
+    const processedUser = {
+      ...userData,
+      height: ensureNumeric(userData.height),
+      weight: ensureNumeric(userData.weight),
+      fitness_goal: ensureNumeric(userData.fitness_goal),
+      initial_weight: ensureNumeric(userData.initial_weight)
+    };
+    dispatch(getUserSuccess(processedUser));
   } catch (error) {
     // Log detailed error to console
     console.error('User fetch error:', error);
     console.error('Response data:', error.response?.data);
     
-    // For user data fetch failures, we can just log out without showing errors
-    // since users don't need to see these technical issues
     dispatch(logout());
   }
 };
@@ -89,27 +118,111 @@ export const loginWithGoogle = (credential) => async (dispatch) => {
   try {
     dispatch(loginStart());
     
+    console.log('Attempting Google login with credential');
+    
+    // Call the API
     const response = await authService.googleLogin(credential);
+    console.log('Google login API response received:', response);
+    
+    // Check for the access token
+    if (!response.access) {
+      console.error('No access token in response:', response);
+      dispatch(authError({ message: 'Login failed: No access token received' }));
+      return;
+    }
     
     // Store token in localStorage
     localStorage.setItem('token', response.access);
-    localStorage.setItem('refreshToken', response.refresh);
+    if (response.refresh) {
+      localStorage.setItem('refreshToken', response.refresh);
+    }
     
-    // Update Redux state
+    // Update Redux with token
     dispatch(loginSuccess({ token: response.access }));
     
-    // Set user data directly if available, or fetch it
+    // Handle user data
     if (response.user) {
-      dispatch(getUserSuccess(response.user));
+      console.log('User data received in Google login response');
+      
+      // Try-catch to ensure graceful handling if user data parsing fails
+      try {
+        // Ensure numeric values for user data
+        const processedUser = {
+          ...response.user,
+          height: ensureNumeric(response.user.height),
+          weight: ensureNumeric(response.user.weight),
+          fitness_goal: ensureNumeric(response.user.fitness_goal),
+          initial_weight: ensureNumeric(response.user.initial_weight)
+        };
+        
+        console.log('Processed user data:', processedUser);
+        dispatch(getUserSuccess(processedUser));
+      } catch (dataError) {
+        console.error('Error processing user data:', dataError);
+        
+        // Create clean user object with nulls for profile metrics
+        const defaultUser = {
+          username: response.user.username || '',
+          email: response.user.email || '',
+          height: null,
+          weight: null, 
+          fitness_goal: null,
+          initial_weight: null
+        };
+        
+        console.log('Using default user data with null metrics:', defaultUser);
+        dispatch(getUserSuccess(defaultUser));
+      }
     } else {
-      dispatch(fetchCurrentUser(response.access));
+      console.log('No user data in response, fetching separately');
+      
+      // Fetch user data separately
+      try {
+        const userData = await authService.getCurrentUser();
+        console.log('User data fetched after Google login:', userData);
+        
+        // Process to ensure numeric types
+        const processedUser = {
+          ...userData,
+          height: ensureNumeric(userData.height),
+          weight: ensureNumeric(userData.weight),
+          fitness_goal: ensureNumeric(userData.fitness_goal),
+          initial_weight: ensureNumeric(userData.initial_weight) 
+        };
+        
+        dispatch(getUserSuccess(processedUser));
+      } catch (fetchError) {
+        console.error('Failed to fetch user after Google login:', fetchError);
+        
+        // Default user with email from token if possible
+        const defaultUser = {
+          username: 'User',
+          email: response.email || '',
+          height: null,
+          weight: null,
+          fitness_goal: null,
+          initial_weight: null
+        };
+        
+        console.log('Using minimal default user data:', defaultUser);
+        dispatch(getUserSuccess(defaultUser));
+      }
     }
   } catch (error) {
-    // Log detailed error to console
     console.error('Google login error:', error);
     
+    // Log detailed error info for debugging
+    if (error.response) {
+      console.error('Error response status:', error.response.status);
+      console.error('Error response data:', error.response.data);
+    }
+    
     // Show simplified message to user
-    const userError = { message: 'Google login failed. Please try again or use email registration.' };
+    const userError = { 
+      message: 'Google login failed. Please try again or use email registration.',
+      details: error.message
+    };
+    
     dispatch(authError(userError));
   }
 };
@@ -160,4 +273,38 @@ export const logoutUser = () => (dispatch) => {
   localStorage.removeItem('token');
   localStorage.removeItem('refreshToken');
   dispatch(logout());
+};
+
+export const updateUserProfile = (userData) => async (dispatch) => {
+  try {
+    console.log('updateUserProfile action called with data:', userData);
+
+    const sanitizedData = {
+      ...userData,
+      height: ensureNumeric(userData.height),
+      weight: ensureNumeric(userData.weight),
+      fitness_goal: ensureNumeric(userData.fitness_goal),
+      initial_weight: ensureNumeric(userData.initial_weight)
+    };
+
+    const updatedUser = await authService.updateProfile(sanitizedData);
+    console.log('API response:', updatedUser);
+
+    const processedUser = {
+      ...updatedUser,
+      height: ensureNumeric(updatedUser.height),
+      weight: ensureNumeric(updatedUser.weight),
+      fitness_goal: ensureNumeric(updatedUser.fitness_goal),
+      initial_weight: ensureNumeric(updatedUser.initial_weight)
+    };
+    
+    dispatch(getUserSuccess(processedUser));
+    
+    return processedUser;
+    
+
+  } catch (error) {
+    console.error('Profile update failed in action:', error);
+    throw error;
+  }
 };

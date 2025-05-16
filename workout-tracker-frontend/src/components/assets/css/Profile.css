@@ -1,0 +1,310 @@
+/* Profile Container */
+.profile-container {
+    max-width: 1500px;
+    margin: 0 auto;
+    margin-top: 2rem;
+    padding: 2rem;
+    background-color: var(--profile-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile-container h2 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+}
+
+/* Unit Toggle */
+.unit-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.unit-btn {
+    padding: 0.5rem 1.5rem;
+    border: 2px solid #007bff;
+    background-color: var(--profile-cmp-bg);
+    color: #007bff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.unit-btn.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.unit-btn:hover:not(.active) {
+    background-color: var(--unit-bg-NaN);
+}
+
+/* Split Layout */
+.split-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Profile Info */
+.profile-info {
+    background-color: var(--profile-cmp-bg);
+    max-width: 75%;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.display-pic {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 1rem;
+    border: 3px solid #007bff;
+}
+
+.info-txt {
+    line-height: 1.6;   
+}
+
+.info-txt p {
+    margin-bottom: 0.5rem;
+}
+
+.edit-input {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border: var(--edit-bd);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/* Profile Stats */
+.profile-stats {
+    background-color: var(--profile-cmp-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-top: 50px;
+}
+
+.profile-stats p {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+/* Profile Goals */
+.profile-goals {
+    background-color: var(--profile-cmp-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.goal-section h3 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+/* Progress Section */
+.progress-section {
+    margin-top: 1rem;
+}
+
+.progress-phase {
+    color: var(--progress-text);
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+    font-weight: bold;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: #28a745;
+    transition: width 0.5s ease;
+    background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent);
+    background-size: 1rem 1rem;
+    animation: progress-animation 1s linear infinite;
+}
+
+@keyframes progress-animation {
+    0% {
+      background-position: 0 0;
+    }
+    100% {
+      background-position: 1rem 0;
+    }
+}
+
+.progress-text {
+    text-align: center;
+    font-weight: bold;
+    color: var(--progress-text);
+}
+
+.weight-change {
+    text-align: center;
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+}
+
+/* BMI Section */
+.bmi-section {
+    background: var(--bmi-bg);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+  
+.bmi-section h3 {
+    margin-bottom: 0.8rem;
+    font-size: 1.3rem;
+}
+  
+.bmi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.8rem;
+}
+  
+.bmi-disclaimer {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    line-height: 1.4;
+}
+
+/* Edit Button */
+.profile-edit {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.edit-btn {
+    padding: 0.75rem 2rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.edit-btn:hover {
+    background-color: #0056b3;
+}
+
+.edit-btn.save {
+    background-color: #28a745;
+}
+
+.edit-btn.save:hover {
+    background-color: #218838;
+}
+
+.edit-btn.cancel {
+    background-color: #dc3545;
+}
+
+.edit-btn.cancel:hover {
+    background-color: #c82333;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Imperial Height Input */
+.imperial-height-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+  
+.height-part {
+    width: 60px !important;
+    text-align: center;
+}
+  
+.height-separator {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--progress-text);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+/* Profile Links */
+.profile-links {
+    text-align: center;
+}
+
+.back-link {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+/* Loading State */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+    color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .profile-container {
+        padding: 1rem;
+    }
+
+    .split-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .display-pic {
+        width: 100px;
+        height: 100px;
+    }
+
+    .bmi-value {
+        font-size: 2.5rem;
+    }
+}
