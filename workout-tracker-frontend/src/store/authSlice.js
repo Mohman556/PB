@@ -15,7 +15,8 @@ const processUserData = (userData) => {
     height: ensureNumeric(userData.height),
     weight: ensureNumeric(userData.weight),
     fitness_goal: ensureNumeric(userData.fitness_goal),
-    initial_weight: ensureNumeric(userData.initial_weight || userData.weight)
+    initial_weight: ensureNumeric(userData.initial_weight || userData.weight),
+    fat_percentage: ensureNumeric(userData.fat_percentage)
   };
 };
 

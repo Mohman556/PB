@@ -5,7 +5,7 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'height', 'weight', 'fitness_goal', 'initial_weight', 'date_of_birth')
+        fields = ('id', 'username', 'email', 'height', 'weight', 'fitness_goal', 'initial_weight', 'date_of_birth', 'fat_percentage')
         read_only_fields = ('id', 'email')
     
     def update(self, instance, validated_data):
@@ -28,6 +28,10 @@ class UserSerializer(serializers.ModelSerializer):
             
         if 'date_of_birth' in validated_data:
             instance.date_of_birth = validated_data.get('date_of_birth')
+
+        if 'fat_percentage' in validated_data:
+            instance.fat_percentage = validated_data.get('fat_percentage')
+            print(f"Setting fat_percentage to: {instance.fat_percentage}")
             
         instance.save()
         print(f"After instance.save() - height: {instance.height}, weight: {instance.weight}")
@@ -45,13 +49,15 @@ class UserSerializer(serializers.ModelSerializer):
             data['initial_weight'] = float(data['initial_weight'])
         if data.get('fitness_goal'):
             data['fitness_goal'] = float(data['fitness_goal'])
+        if data.get('fat_percentage'):
+            data['fat_percentage'] = float(data['fat_percentage'])
         return data
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password', 'height', 'weight', 'initial_weight', 'fitness_goal', 'date_of_birth')
+        fields = ('id', 'username', 'email', 'password', 'height', 'weight', 'initial_weight', 'fitness_goal', 'date_of_birth', 'fat_percentage')
         extra_kwargs = {'password': {'write_only': True}}
     
 

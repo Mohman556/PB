@@ -9,6 +9,7 @@ class User(AbstractUser):
     fitness_goal = models.FloatField(null=True, blank=True)
     initial_weight = models.FloatField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
+    fat_percentage = models.FloatField(null=True, blank=True)
 
     # Method to initialize initial_weight if it's not set
     def save(self, *args, **kwargs):

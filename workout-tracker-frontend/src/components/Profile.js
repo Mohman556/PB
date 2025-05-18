@@ -17,6 +17,7 @@ const Profile = () => {
   const [isMetric, setIsMetric] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState(null);
+  const [fatPercentage, setFatPercentage] = useState(20); // Default fat percentage
 
   // Initial edited data state - empty until user data is properly loaded
   const [editedData, setEditedData] = useState({
@@ -26,7 +27,8 @@ const Profile = () => {
     weight: '',
     initial_weight: '',
     fitness_goal: '',
-    date_of_birth: ''
+    date_of_birth: '',
+    fat_percentage: ''
   });
 
   // Helper functions for data processing
@@ -43,6 +45,7 @@ const Profile = () => {
         weight: ensureNumeric(profileData.weight),
         fitness_goal: ensureNumeric(profileData.fitness_goal),
         initial_weight: ensureNumeric(profileData.initial_weight),
+        fat_percentage: ensureNumeric(profileData.fat_percentage) || fatPercentage,
         savedAt: new Date().toISOString()
       };
       
@@ -104,7 +107,8 @@ const Profile = () => {
             weight: backupData.weight,
             initial_weight: backupData.initial_weight,
             fitness_goal: backupData.fitness_goal,
-            date_of_birth: user.date_of_birth || ''
+            date_of_birth: user.date_of_birth || '',
+            fat_percentage: backupData.fat_percentage || fatPercentage
           };
           
           // Only update Redux if not already mounted (first load)
@@ -114,7 +118,8 @@ const Profile = () => {
               height: backupData.height,
               weight: backupData.weight,
               fitness_goal: backupData.fitness_goal,
-              initial_weight: backupData.initial_weight
+              initial_weight: backupData.initial_weight,
+              fat_percentage: backupData.fat_percentage || fatPercentage
             };
             dispatch(getUserSuccess(restoredUser));
           }
@@ -127,7 +132,8 @@ const Profile = () => {
             weight: ensureNumeric(user.weight),
             initial_weight: ensureNumeric(user.initial_weight || user.weight),
             fitness_goal: ensureNumeric(user.fitness_goal),
-            date_of_birth: user.date_of_birth || ''
+            date_of_birth: user.date_of_birth || '',
+            fat_percentage: ensureNumeric(user.fat_percentage) || fatPercentage
           };
         }
       } else {
@@ -139,7 +145,8 @@ const Profile = () => {
           weight: user.weight,
           initial_weight: user.initial_weight || user.weight,
           fitness_goal: user.fitness_goal,
-          date_of_birth: user.date_of_birth || ''
+          date_of_birth: user.date_of_birth || '',
+          fat_percentage: user.fat_percentage || fatPercentage
         };
       }
       
@@ -158,7 +165,7 @@ const Profile = () => {
         isInitialized.current = false;
       }
     };
-  }, [user, dispatch]);
+  }, [user, dispatch, fatPercentage]);
 
   // Display helpers
   const safeDisplayValue = (value, defaultValue = '0.0') => {
@@ -197,7 +204,7 @@ const Profile = () => {
     let processedValue = value;
     
     // Parse numeric fields
-    if (['height', 'weight', 'fitness_goal', 'initial_weight'].includes(name)) {
+    if (['height', 'weight', 'fitness_goal', 'initial_weight', 'fat_percentage'].includes(name)) {
       if (value === '') {
         processedValue = '';
       } else {
@@ -303,7 +310,8 @@ const Profile = () => {
         height: !isNaN(parseFloat(editedData.height)) ? parseFloat(editedData.height) : user.height || 0,
         weight: !isNaN(parseFloat(editedData.weight)) ? parseFloat(editedData.weight) : user.weight || 0,
         fitness_goal: !isNaN(parseFloat(editedData.fitness_goal)) ? parseFloat(editedData.fitness_goal) : user.fitness_goal || 0,
-        date_of_birth: editedData.date_of_birth
+        date_of_birth: editedData.date_of_birth,
+        fat_percentage: !isNaN(parseFloat(editedData.fat_percentage)) ? parseFloat(editedData.fat_percentage) : fatPercentage
       };
       
       // Handle initial_weight specially to avoid null issues
@@ -350,7 +358,8 @@ const Profile = () => {
         weight: ensureNumeric(user.weight),
         initial_weight: ensureNumeric(user.initial_weight || user.weight),
         fitness_goal: ensureNumeric(user.fitness_goal),
-        date_of_birth: user.date_of_birth || ''
+        date_of_birth: user.date_of_birth || '',
+        fat_percentage: ensureNumeric(user.fat_percentage) || fatPercentage
       });
     }
   };
@@ -365,6 +374,15 @@ const Profile = () => {
     
     const heightInM = height / 100;
     return (weight / (heightInM * heightInM)).toFixed(1);
+  };
+
+  const getBMICategory = () => {
+    const bmi = parseFloat(calculateBMI());
+    if (bmi < 18.5) return { label: "Underweight", color: "#3498db" };
+    if (bmi < 25) return { label: "Healthy Weight", color: "#2ecc71" };
+    if (bmi < 30) return { label: "Overweight", color: "#f39c12" };
+    if (bmi < 40) return { label: "Obesity", color: "#e74c3c" };
+    return { label: "Extreme Obesity", color: "#991b1b" };
   };
 
   const calculateProgress = () => {
@@ -418,87 +436,58 @@ const Profile = () => {
     };
   };
 
-  // Determine if in cutting or bulking phase
-  const isCutting = user && ensureNumeric(user.fitness_goal) < ensureNumeric(user.initial_weight || user.weight);
-  
   // Weight change calculation
   const weightChange = calculateWeightChange();
   const weightChangeText = weightChange.isGain
     ? `Progress to date: ↑ ${Math.abs(weightChange.value)} ${isMetric ? 'kg' : 'lbs'}`
     : `Progress to date: ↓ ${Math.abs(weightChange.value)} ${isMetric ? 'kg' : 'lbs'}`;
 
+  // Determine if in cutting or bulking phase
+  const isCutting = user && ensureNumeric(user.fitness_goal) < ensureNumeric(user.initial_weight || user.weight);
+  
+  // Calculate age from date of birth
+  const getAge = () => {
+    if (!user || !user.date_of_birth) return '';
+    const dob = new Date(user.date_of_birth);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      return age - 1;
+    }
+    return age;
+  };
+
+  // Get days since joining
+  const joinDate = "2025-01-10"; // Placeholder - replace with actual join date when available
+  const daysSinceJoining = () => {
+    const join = new Date(joinDate);
+    const today = new Date();
+    const diffTime = Math.abs(today - join);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  // Mock achievements - replace with actual achievements when implemented
+  const achievements = [
+    { id: 1, title: "First Step", description: "Created your profile", completed: true, icon: "🏆" },
+    { id: 2, title: "Getting Started", description: "Lost first 5kg", completed: user && ensureNumeric(user.initial_weight) - ensureNumeric(user.weight) >= 5, icon: "🔻" },
+    { id: 3, title: "Halfway There", description: "Reached 50% of your goal", completed: parseFloat(calculateProgress()) >= 50, icon: "🚀" },
+    { id: 4, title: "Almost There", description: "Reached 75% of your goal", completed: parseFloat(calculateProgress()) >= 75, icon: "🌟" },
+    { id: 5, title: "Goal Reached!", description: "Reached 75% of your goal", completed: parseFloat(calculateProgress()) >= 75, icon: "🏁" }
+  ];
+
   // Loading state
   if (!user) {
     return <div className="loading">Loading profile...</div>;
   }
 
-  // Debug component
-  const DebugDisplay = ({user}) => {
-    if (process.env.NODE_ENV === 'production') return null;
-    
-    const isValidNumber = (val) => val !== null && val !== undefined && !isNaN(parseFloat(val));
-    
-    return (
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        border: '1px solid #dee2e6',
-        borderRadius: '4px',
-        fontSize: '0.8rem',
-        fontFamily: 'monospace',
-        color: 'black'
-      }}>
-        <h4>Debug Values (Dev Only)</h4>
-        <div>
-          <p><strong>Component State:</strong> Mounted: {isMounted.current ? 'Yes' : 'No'}, Initialized: {isInitialized.current ? 'Yes' : 'No'}</p>
-          <p><strong>Height:</strong> {user.height} ({typeof user.height})</p>
-          <p><strong>Weight:</strong> {user.weight} ({typeof user.weight})</p>
-          <p><strong>Initial Weight:</strong> {user.initial_weight} ({typeof user.initial_weight})</p>
-          <p><strong>Fitness Goal:</strong> {user.fitness_goal} ({typeof user.fitness_goal})</p>
-          <p><strong>Is data numeric?</strong> {
-            isValidNumber(user.height) && 
-            isValidNumber(user.weight) && 
-            isValidNumber(user.fitness_goal) ? 
-            '✅ Yes' : '❌ No'
-          }</p>
-        </div>
-      </div>
-    );
-  };
-
-  // Redux update test function
-  const checkReduxUpdate = () => {
-    try {
-      const currentUser = {...user};
-      console.log('Current user in Redux:', currentUser);
-      
-      // Create test data with explicit numeric types
-      const testData = {
-        ...currentUser,
-        height: 180.5,
-        weight: 75.2,
-        fitness_goal: 70.0,
-        initial_weight: 80.0
-      };
-      
-      console.log('Dispatching test data to Redux:', testData);
-      
-      // Dispatch directly to Redux
-      dispatch(getUserSuccess(testData));
-      
-      alert('Test data dispatched to Redux. Check console for details and refresh page to see if changes persist.');
-    } catch (error) {
-      console.error('Redux update check failed:', error);
-      alert('Redux update test error: ' + error.message);
-    }
-  };
+  const bmiCategory = getBMICategory();
 
   return (
     <div className="profile-container">
-      <h2>User Profile</h2>
+      <h2 className="text-2xl font-bold mb-6">My Profile</h2>
       
-      <div className="unit-toggle">
+      <div className="unit-toggle flex justify-center mb-6">
         <button 
           className={`unit-btn ${isMetric ? 'active' : ''}`}
           onClick={() => setIsMetric(true)}
@@ -513,116 +502,326 @@ const Profile = () => {
         </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message mb-4">{error}</div>}
 
-      <div className='split-layout'>
-        <div className="profile-info">
-          <img id='tmp' alt='Temporary dp' className='display-pic' src={tmp} />
-          <div className='info-txt'>
-            {isEditing ? (
-              <div>
-                <input type="text" name="username" value={editedData.username} onChange={handleInputChange} className="edit-input" placeholder="Username"/>
-                <input type="email" name="email" value={editedData.email} onChange={handleInputChange} className="edit-input" placeholder="Email" readOnly />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left column - User info */}
+        <div className="md:col-span-1">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+            <div className="flex justify-center mb-4">
+              <img 
+                src={tmp} 
+                alt="Profile" 
+                className="w-24 h-24 rounded-full object-cover border-4 border-blue-500"
+              />
+            </div>
+            
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold">{user.username}</h3>
+              <p className="text-gray-600">{user.email}</p>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Height: </span>
+                <span className="font-medium">
+                  &nbsp;{safeDisplayHeight(user.height)} {isMetric ? 'cm' : ''}
+                </span>
               </div>
-            ) : (
-              <div>
-                <p><strong>Username:</strong> {user.username}</p>
-                <p><strong>Email:</strong> {user.email}</p>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Age: </span>
+                <span className="font-medium">&nbsp;{getAge()} years old</span>
               </div>
-            )}
+            </div>
+            
+            {/* Quick Actions Section */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h4 className="font-semibold mb-4">Quick Actions</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <button className="flex flex-col items-center justify-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                  <span className="text-2xl mb-1">⚖️</span>
+                  <span className="text-sm font-medium">Log Weight</span>
+                </button>
+                <button className="flex flex-col items-center justify-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                  <span className="text-2xl mb-1">💪</span>
+                  <span className="text-sm font-medium">New Workout</span>
+                </button>
+                <button className="flex flex-col items-center justify-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                  <span className="text-2xl mb-1">📊</span>
+                  <span className="text-sm font-medium">View Stats</span>
+                </button>
+                <button className="flex flex-col items-center justify-center p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
+                  <span className="text-2xl mb-1">🎯</span>
+                  <span className="text-sm font-medium">Set Goals</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div className='profile-stats'>
-          {isEditing ? (
-            <>
-              <div className="form-group">
-                <label><strong>Height:</strong></label>
-                {isMetric ? (
-                  <input type="number" name="height" value={editedData.height || ''} onChange={handleInputChange} className="edit-input" placeholder="Height in cm"/>
-                ) : (
-                  <div className="imperial-height-input">
-                    <input type="number" value={getImperialHeightForEdit().feet} onChange={(e) => handleImperialHeightChange('feet', e.target.value)} className="edit-input height-part" placeholder="Feet" min="0" max="9"/>
-                    <span className="height-separator">'</span>
-                    <input type="number" value={getImperialHeightForEdit().inches} onChange={(e) => handleImperialHeightChange('inches', e.target.value)} className="edit-input height-part" placeholder="Inches" min="0" max="11"/>
-                    <span className="height-separator">"</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label><strong>Date of Birth:</strong></label>
-                <input type="date" name="date_of_birth" value={editedData.date_of_birth} onChange={handleInputChange} className="edit-input"/>
-              </div>
-            </>
-          ) : (
-            <>
-              <p><strong>Height:</strong> {safeDisplayHeight(user.height)} {isMetric ? 'cm' : ''}</p>          
-              <p><strong>Date of Birth:</strong> {user.date_of_birth}</p>
-            </>
-          )}
         </div>
-        </div>
-
-        <div className='profile-goals'>
-          <div className="goal-section">
-            <h3>Fitness Goal</h3>
+        
+        {/* Right columns */}
+        <div className="md:col-span-2">
+          {/* Fitness Goal Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
+            <h3 className="text-xl font-bold mb-1">Fitness Goal</h3>
+            <p className="text-gray-600 text-sm mb-4">Track your weight progress</p>
+            
             {isEditing ? (
-              <>
+              <div className="space-y-4 mb-4">
                 <div className="form-group">
-                  <label><strong>Weight:</strong></label>
-                  <input type="number" name="weight" value={getEditDisplayWeight()} onChange={handleInputChange} className="edit-input" placeholder={isMetric ? "Weight in kg" : "Weight in lbs"}/>
+                  <label className="block mb-1 font-medium">Current Weight:</label>
+                  <input 
+                    type="number" 
+                    name="weight" 
+                    value={getEditDisplayWeight()} 
+                    onChange={handleInputChange} 
+                    className="edit-input w-full" 
+                    placeholder={isMetric ? "Weight in kg" : "Weight in lbs"}
+                  />
                 </div>
                 <div className="form-group">
-                  <label><strong>Initial Weight:</strong></label>
-                  <input type="number" name="initial_weight" value={getEditInitialWeight()} onChange={handleInputChange} className="edit-input" placeholder={isMetric ? "Initial weight in kg" : "Initial weight in lbs"} step="0.1"/>
+                  <label className="block mb-1 font-medium">Initial Weight:</label>
+                  <input 
+                    type="number" 
+                    name="initial_weight" 
+                    value={getEditInitialWeight()} 
+                    onChange={handleInputChange} 
+                    className="edit-input w-full" 
+                    placeholder={isMetric ? "Initial weight in kg" : "Initial weight in lbs"} 
+                    step="0.1"
+                  />
                 </div>
                 <div className="form-group">
-                  <label><strong>Target Weight:</strong></label>
-                  <input type="number" name="fitness_goal" value={getEditDisplayGoal()} onChange={handleInputChange} className="edit-input" placeholder={isMetric ? "Target weight in kg" : "Target weight in lbs"} step="0.1"/>
+                  <label className="block mb-1 font-medium">Target Weight:</label>
+                  <input 
+                    type="number" 
+                    name="fitness_goal" 
+                    value={getEditDisplayGoal()} 
+                    onChange={handleInputChange} 
+                    className="edit-input w-full" 
+                    placeholder={isMetric ? "Target weight in kg" : "Target weight in lbs"} 
+                    step="0.1"
+                  />
                 </div>
-              </>
+                <div className="form-group">
+                  <label className="block mb-1 font-medium">Body Fat Percentage:</label>
+                  <input 
+                    type="number" 
+                    name="fat_percentage" 
+                    value={editedData.fat_percentage} 
+                    onChange={handleInputChange} 
+                    className="edit-input w-full" 
+                    placeholder="Body fat %" 
+                    step="0.1"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="block mb-1 font-medium">Height:</label>
+                  {isMetric ? (
+                    <input 
+                      type="number" 
+                      name="height" 
+                      value={editedData.height || ''} 
+                      onChange={handleInputChange} 
+                      className="edit-input w-full" 
+                      placeholder="Height in cm"
+                    />
+                  ) : (
+                    <div className="flex space-x-2">
+                      <div className="flex-1">
+                        <input 
+                          type="number" 
+                          value={getImperialHeightForEdit().feet} 
+                          onChange={(e) => handleImperialHeightChange('feet', e.target.value)} 
+                          className="edit-input w-full" 
+                          placeholder="Feet" 
+                          min="0" 
+                          max="9"
+                        />
+                        <span className="text-xs">feet</span>
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="number" 
+                          value={getImperialHeightForEdit().inches} 
+                          onChange={(e) => handleImperialHeightChange('inches', e.target.value)} 
+                          className="edit-input w-full" 
+                          placeholder="Inches" 
+                          min="0" 
+                          max="11"
+                        />
+                        <span className="text-xs">inches</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label className="block mb-1 font-medium">Date of Birth:</label>
+                  <input 
+                    type="date" 
+                    name="date_of_birth" 
+                    value={editedData.date_of_birth} 
+                    onChange={handleInputChange} 
+                    className="edit-input w-full"
+                  />
+                </div>
+              </div>
             ) : (
               <>
-                <p><strong>Current Weight:</strong> {safeDisplayWeight(user.weight)} {isMetric ? 'kg' : 'lbs'}</p>
-                <p><strong>Initial Weight:</strong> {safeDisplayWeight(user.initial_weight)} {isMetric ? 'kg' : 'lbs'}</p>
-                <p><strong>Target Weight:</strong> {safeDisplayWeight(user.fitness_goal)} {isMetric ? 'kg' : 'lbs'}</p>
-              </>
-            )}
-                   
-            {!isEditing && (
-              <div className="progress-section">
-                <h4 className="progress-phase">
-                  {isCutting ? '🔻 Cutting Phase' : '📈 Bulking Phase'}
-                </h4>
-                <div className="progress-bar">
+                <div className="grid grid-cols-3 gap-4" style={{marginBottom:'2em'}}>
+                  <div className="text-center">
+                    <span className="block text-sm text-gray-600">Starting: </span>
+                    <span className="block text-xl font-bold">{safeDisplayWeight(user.initial_weight)} {isMetric ? 'kg' : 'lbs'}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-sm text-gray-600">Current: </span>
+                    <span className="block text-xl font-bold text-blue-600">{safeDisplayWeight(user.weight)} {isMetric ? 'kg' : 'lbs'}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-sm text-gray-600">Goal: </span>
+                    <span className="block text-xl font-bold text-green-600">{safeDisplayWeight(user.fitness_goal)} {isMetric ? 'kg' : 'lbs'}</span>
+                  </div>
+                </div>
+                
+                <div className="mb-2 flex justify-between items-center" style={{marginBottom:'1em'}}>
+                  <div>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      {isCutting ? '🔻 Cutting Phase' : '📈 Bulking Phase'}
+                    </span>
+                  </div>
+                </div>
+
+                <span className="text-sm font-medium text-center ">{calculateProgress()}% complete</span>
+
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
                   <div 
-                    className="progress-bar-fill"
+                    className="bg-gradient-to-r from-green-500 to-green-300 h-2 rounded-full" 
                     style={{ width: `${calculateProgress()}%` }}
                   ></div>
                 </div>
-                <p className="progress-text">{calculateProgress()}% towards goal</p>
-                <p className="weight-change">
-                  {weightChangeText}
-                </p>
-              </div>
+                
+                <p className="text-center font-medium">{weightChangeText}</p>
+              </>
             )}
           </div>
-
-          {!isEditing && (
-            <div className="bmi-section">
-              <h3>BMI (Body Mass Index)</h3>
-              <div className="bmi-value">{calculateBMI()}</div>
-              <p className="bmi-disclaimer">
-                <strong>Note:</strong> BMI is a simple measurement tool but doesn't account for muscle mass, 
-                bone structure, or fitness level. It's just one indicator and not the definitive measure of health.
+          
+            {/* BMI Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold mb-1">BMI Analysis</h3>
+              <p className="text-gray-600 text-sm mb-4">Body Mass Index calculation</p>
+              
+              <div className="flex justify-center mb-3">
+                <span className="text-4xl font-bold">{calculateBMI()}</span>
+              </div>
+              <br></br>
+              <div className="flex justify-center mb-3">
+                <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full" 
+                  style={{ backgroundColor: `${bmiCategory.color}20`, color: bmiCategory.color }}>
+                  {bmiCategory.label}
+                </span>
+              </div>
+              
+              <div className="relative pt-1 mb-4">
+                <div className="flex mb-2 items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full bg-blue-100 text-blue-700">
+                      BMI Scale
+                    </span>
+                  </div>
+                </div>
+                <div className="flex h-2 mb-0 overflow-hidden bg-blue-200 rounded">
+                  <div style={{ width: '20%' }} className="bg-blue-500 text-xs"></div>
+                  <div style={{ width: '20%' }} className="bg-green-500"></div>
+                  <div style={{ width: '20%' }} className="bg-yellow-500"></div>
+                  <div style={{ width: '20%' }} className="bg-red-500"></div>
+                  <div style={{ width: '20%' }} className="bg-red-800"></div>
+                </div>
+                <div className="flex h-2 mb-0 overflow-hidden bg-blue-200 rounded text-xs">
+                  <div style={{ width: '20%' }}>0</div>
+                  <div style={{ width: '20%' }}>18.5</div>
+                  <div style={{ width: '20%' }}>25</div>
+                  <div style={{ width: '20%' }}>30</div>
+                  <div style={{ width: '20%' }}>40+</div>
+                </div>
+              </div>
+              
+              <p className="text-sm text-gray-600 text-center">
+                BMI is a simple measurement tool but doesn't account for muscle mass, bone structure, or fitness level. It's just one indicator and not the definitive measure of health.
               </p>
             </div>
-          )}
+            <br></br>
+            {/* Achievements Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold mb-1">Achievements</h3>
+              <p className="text-gray-600 text-sm mb-4">Track your fitness milestones</p>
+              
+              <div className="space-y-3">
+                {achievements.map(achievement => (
+                  <div 
+                    key={achievement.id} 
+                    className={`flex items-center p-2 rounded-lg ${
+                      achievement.completed 
+                        ? 'bg-green-50' 
+                        : 'bg-gray-100 opacity-60'
+                    }`}
+                  >
+                    <div style={{marginRight:'1em',marginLeft:'1em'}} className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      achievement.completed 
+                        ? 'bg-green-100' 
+                        : 'bg-gray-200'
+                    }`}>
+                      <span className="text-lg">{achievement.icon}</span>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h4 className="text-sm font-medium">
+                        {achievement.title}
+                      </h4>
+                      <p className="text-xs text-gray-500">{achievement.description}</p>
+                    </div>
+                    <div style={{marginRight:'1em'}}>
+                      {achievement.completed ? (
+                        <span className="text-green-500">✓</span>
+                      ) : (
+                        <span className="text-gray-400">○</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          <br></br>
+          {/* Detailed Stats Preview */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-bold mb-1">Detailed Stats</h3>
+            <p className="text-gray-600 text-sm mb-4">Your fitness journey in numbers</p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-3 rounded-lg px-2">
+                <p className="text-blue-700 text-sm font-medium">Weight Change Rate</p>
+                <p className="text-xl font-bold">0.8 kg/week</p>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg px-2">
+                <p className="text-green-700 text-sm font-medium">Workouts This Month</p>
+                <p className="text-xl font-bold">12 sessions</p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-lg px-2">
+                <p className="text-purple-700 text-sm font-medium">Body Fat</p>
+                <p className="text-xl font-bold">{user.fat_percentage || fatPercentage}%</p>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg px-2">
+                <p className="text-yellow-700 text-sm font-medium">Goal ETA</p>
+                <p className="text-xl font-bold">Aug 15</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className='profile-edit'>
+      
+      <div className="mt-6 text-center">
         {isEditing ? (
-          <div>
+          <div className="flex justify-center space-x-4">
             <button 
               className="edit-btn save"
               onClick={handleSave}
@@ -634,7 +833,6 @@ const Profile = () => {
               className="edit-btn cancel"
               onClick={handleCancel}
               disabled={isUpdating}
-              style={{ marginLeft: '1rem' }}
             >
               Cancel
             </button>
@@ -644,37 +842,14 @@ const Profile = () => {
             className="edit-btn"
             onClick={() => setIsEditing(true)}
           >
-            Edit Profile
+            Edit Profile 🖊
           </button>
         )}
       </div>
 
-      <div className="profile-links">
+      <div className="mt-4 text-center">
         <Link to="/dashboard" className="back-link">← Back to Dashboard</Link>
       </div>
-      
-      {/* Debug tools - only shows in development mode */}
-      {process.env.NODE_ENV !== 'production' && (
-        <div className="debug-section" style={{ marginTop: '2rem', padding: '1rem', borderTop: '1px solid #dee2e6' }}>
-          <h4>Debug Tools</h4>
-          <button
-            onClick={checkReduxUpdate}
-            style={{
-              marginTop: '1rem',
-              background: '#17a2b8',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Test Redux Update
-          </button>
-          
-          <DebugDisplay user={user} />
-        </div>
-      )}
     </div>
   );
 };
